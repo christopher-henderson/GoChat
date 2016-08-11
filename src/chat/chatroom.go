@@ -1,31 +1,36 @@
 package chat
 
 import (
-	"fmt"
+	"sync"
 
-	"golang.org/x/net/websocket"
+	"github.com/gorilla/websocket"
 )
 
 type ChatRoom struct {
-	clients map[*Client]bool
+	sync.Mutex
+	clients map[string]*Client
 	log     *Log
+	Name    string
 }
 
-func CreateChatRoom() *ChatRoom {
+func CreateChatRoom(name string) *ChatRoom {
 	log := Log{}
-	room := ChatRoom{make(map[*Client]bool), &log}
+	room := ChatRoom{clients: make(map[string]*Client), log: &log, Name: name}
 	return &room
 }
 
-func (room *ChatRoom) Register(clientSocket *websocket.Conn) {
-	client := &Client{clientSocket, room}
-	if _, ok := room.clients[client]; ok {
+func (room *ChatRoom) Register(clientSocket *websocket.Conn, name string) {
+	room.Lock()
+	defer room.Unlock()
+	if _, ok := room.clients[name]; ok {
 		return
 	}
-	room.clients[client] = true
+	room.clients[name] = CreateClient(clientSocket, room, name)
 }
 
-func (room *ChatRoom) Unregister(client *Client) {
+func (room *ChatRoom) Unregister(client string) {
+	room.Lock()
+	defer room.Unlock()
 	if _, ok := room.clients[client]; !ok {
 		return
 	}
@@ -34,10 +39,7 @@ func (room *ChatRoom) Unregister(client *Client) {
 
 func (room *ChatRoom) Broadcast(message *Message) {
 	room.log.Append(message)
-	// for client := range room.clients {
-	// 	client.broadcast(message)
-	// }
-	for _, m := range room.log.Slice() {
-		fmt.Println("thing is ", m)
+	for _, client := range room.clients {
+		go client.Accept(message)
 	}
 }
