@@ -11,15 +11,15 @@ type Node struct {
 }
 
 type Log struct {
-	lock sync.Mutex
+	sync.Mutex
 	head *Node
 	tail *Node
 	size int
 }
 
 func (l *Log) Append(message *Message) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
+	l.Lock()
+	defer l.Unlock()
 	node := Node{message, l.tail, nil}
 	if l.head == nil {
 		l.head = &node
@@ -41,8 +41,8 @@ func (l *Log) Append(message *Message) {
 func (l *Log) Iter() <-chan *Message {
 	channel := make(chan *Message)
 	go func() {
-		l.lock.Lock()
-		defer l.lock.Unlock()
+		l.Lock()
+		defer l.Unlock()
 		defer close(channel)
 		node := l.head
 		for node != nil {
