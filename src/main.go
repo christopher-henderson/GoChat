@@ -2,15 +2,13 @@ package main
 
 import (
 	"chat"
+	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-var room *chat.ChatRoom = chat.CreateChatRoom("The first")
-
-var hub chat.Hub = chat.Hub{}
+var hub chat.Hub = chat.CreateHub()
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -20,6 +18,7 @@ var upgrader = websocket.Upgrader{
 func upgradeWebsocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	chatRoom := hub.Get(r.URL.Query().Get("room"))
@@ -27,6 +26,6 @@ func upgradeWebsocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	m := chat.Message{"HEY YOU GUYS", "Bill Bobb", time.Now()}
-	room.Broadcast(&m)
+	http.HandleFunc("/ws", upgradeWebsocket)
+	http.ListenAndServe(":8000", nil)
 }

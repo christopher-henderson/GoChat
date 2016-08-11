@@ -1,6 +1,8 @@
 package chat
 
 import (
+	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -25,7 +27,9 @@ func (room *ChatRoom) Register(clientSocket *websocket.Conn, name string) {
 	if _, ok := room.clients[name]; ok {
 		return
 	}
+	fmt.Println("Registering " + name + " to chatroom " + room.Name)
 	room.clients[name] = CreateClient(clientSocket, room, name)
+	room.Broadcast(CreateMessage(name+" has joined the room.", "server"))
 }
 
 func (room *ChatRoom) Unregister(client string) {
@@ -39,7 +43,17 @@ func (room *ChatRoom) Unregister(client string) {
 
 func (room *ChatRoom) Broadcast(message *Message) {
 	room.log.Append(message)
+	m, err := json.Marshal(PrepareJSON(message))
+	if err != nil {
+		// NUTS!
+		fmt.Println("Failed to marshal message.")
+		return
+	}
+	room.BroadcastJSON(string(m))
+}
+
+func (room *ChatRoom) BroadcastJSON(message string) {
 	for _, client := range room.clients {
-		go client.Accept(message)
+		go client.Notify(message)
 	}
 }

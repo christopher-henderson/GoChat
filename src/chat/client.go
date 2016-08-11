@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"encoding/json"
 	"io"
 	"time"
 
@@ -12,51 +11,58 @@ type Client struct {
 	ws       *websocket.Conn
 	chatroom *ChatRoom
 	Name     string
-	in       chan *Message
+	in       chan string
 }
 
 func CreateClient(ws *websocket.Conn, chatroom *ChatRoom, name string) *Client {
-	client := &Client{ws, chatroom, name, make(chan *Message)}
-	go client.startAccepting()
-	go client.startGenerating()
+	client := &Client{ws, chatroom, name, make(chan string)}
+	go client.StartMessageListener()
+	go client.StartNoticationListener()
 	return client
 }
 
-func (c *Client) Close() {
-	c.ws.Close()
-	c.chatroom.Unregister(c.Name)
-}
-
-func (c *Client) Accept(message *Message) {
-	c.in <- message
-}
-
-func (c *Client) startGenerating() {
+func (c *Client) StartMessageListener() {
 	for {
-		messageType, r, _ := c.ws.NextReader()
+		messageType, r, err := c.ws.NextReader()
+		if err != nil {
+			c.ws.Close()
+			return
+		}
 		switch messageType {
-		case websocket.CloseMessage:
-			c.Close()
 		case websocket.TextMessage:
-			c.generate(r)
+			go c.Broadcast(r)
+		case websocket.BinaryMessage:
+			// lol wat
+			continue
+		default:
+			// LOL WAT
+			continue
 		}
 	}
 }
 
-func (c *Client) generate(r io.Reader) {
+func (c *Client) StartNoticationListener() {
+	for message := range c.in {
+		err := c.ws.WriteJSON(message)
+		if err != nil {
+			// nuts
+			continue
+		}
+	}
+}
+
+func (c *Client) Broadcast(r io.Reader) {
 	var m []byte
 	r.Read(m)
 	message := Message{string(m), c.Name, time.Now()}
 	c.chatroom.Broadcast(&message)
 }
 
-func (c *Client) startAccepting() {
-	for message := range c.in {
-		m, err := json.Marshal(message)
-		if err != nil {
-			c.ws.WriteJSON([]byte("WHOOPS"))
-		} else {
-			c.ws.WriteJSON(m)
-		}
-	}
+func (c *Client) Notify(obj string) {
+	c.in <- obj
+}
+
+func (c *Client) Close() {
+	c.ws.Close()
+	c.chatroom.Unregister(c.Name)
 }
