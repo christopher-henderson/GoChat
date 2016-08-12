@@ -43,7 +43,12 @@ func (c *Client) StartMessageListener() {
 
 func (c *Client) StartNoticationListener() {
 	for message := range c.in {
-		err := c.ws.WriteJSON(message)
+		writer, err := c.ws.NextWriter(websocket.TextMessage)
+		if err != nil {
+			return
+		}
+		_, err = writer.Write([]byte(message))
+		writer.Close()
 		if err != nil {
 			// nuts
 			continue

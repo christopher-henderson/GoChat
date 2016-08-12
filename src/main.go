@@ -27,5 +27,6 @@ func upgradeWebsocket(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/ws", upgradeWebsocket)
+	http.Handle("/", http.FileServer(http.Dir("../static")))
 	http.ListenAndServe(":8000", nil)
 }
